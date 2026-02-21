@@ -1,0 +1,17 @@
+export const ADMIN_ROUTES = {
+  LOGIN: '/login',
+  DASHBOARD: '/',
+  VENDORS: '/vendors',
+  VENDOR_DETAIL: '/vendors/:id',
+  USERS: '/users',
+  USER_DETAIL: '/users/:id',
+  LISTINGS: '/listings',
+  LISTING_DETAIL: '/listings/:id',
+  LISTING_APPROVALS: '/listings/approvals',
+  BOOKINGS: '/bookings',
+  BOOKING_DETAIL: '/bookings/:id',
+  CATEGORIES: '/categories',
+  REVIEWS: '/reviews',
+  REPORTS: '/reports',
+  SETTINGS: '/settings',
+};
