@@ -1,4 +1,4 @@
-import type { MouseEvent } from 'react';
+import type { MouseEvent as ReactMouseEvent } from 'react';
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { MdSearch, MdClose, MdKeyboardArrowDown, MdCheck } from 'react-icons/md';
 
@@ -36,7 +36,7 @@ const SearchableSelect = ({
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
+    const handleClickOutside = (e: Event) => {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setIsOpen(false);
         setSearch('');
@@ -77,13 +77,13 @@ const SearchableSelect = ({
     [multiple, value, onChange]
   );
 
-  const handleClear = (e: MouseEvent) => {
+  const handleClear = (e: ReactMouseEvent) => {
     e.stopPropagation();
     onChange(multiple ? [] : '');
     setSearch('');
   };
 
-  const handleRemoveTag = (optionValue: string, e: MouseEvent) => {
+  const handleRemoveTag = (optionValue: string, e: ReactMouseEvent) => {
     e.stopPropagation();
     if (multiple && Array.isArray(value)) {
       onChange(value.filter((v) => v !== optionValue));

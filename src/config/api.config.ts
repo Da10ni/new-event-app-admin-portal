@@ -10,6 +10,13 @@ export const API_CONFIG = {
       LISTINGS: '/admin/listings',
       BOOKINGS: '/admin/bookings',
       CATEGORIES: '/admin/categories',
+      REPORTS: {
+        BASE: '/admin/reports',
+        REVENUE: '/admin/reports/revenue',
+        BOOKINGS: '/admin/reports/bookings',
+        USER_GROWTH: '/admin/reports/user-growth',
+        TOP_VENDORS: '/admin/reports/top-vendors',
+      },
     },
     CATEGORIES: { BASE: '/categories' },
     UPLOAD: { IMAGE: '/upload/image', IMAGES: '/upload/images' },
