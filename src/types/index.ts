@@ -1,6 +1,23 @@
 export interface ApiResponse<T> { success: boolean; message: string; data: T; meta?: { page: number; limit: number; total: number; totalPages: number }; }
 export interface AdminUser { _id: string; firstName: string; lastName: string; email: string; role: string; avatar: { url: string }; isActive: boolean; createdAt: string; }
-export interface DashboardStats { totalUsers: number; totalVendors: number; totalListings: number; totalBookings: number; pendingVendors: number; pendingListings: number; }
+export interface RevenueDataPoint { month: string; revenue: number; bookings: number; [key: string]: unknown; }
+export interface CategoryBookingData { category: string; count: number; [key: string]: unknown; }
+export interface DashboardTrends { users: number; vendors: number; bookings: number; revenue: number; }
+export interface DashboardStats {
+  totalUsers: number;
+  totalVendors: number;
+  totalListings: number;
+  totalBookings: number;
+  pendingVendors: number;
+  pendingListings: number;
+  totalRevenue: number;
+  recentBookings: Booking[];
+  pendingVendorsList: Vendor[];
+  pendingListingsList: Listing[];
+  revenueData: RevenueDataPoint[];
+  bookingsByCategory: CategoryBookingData[];
+  trends: DashboardTrends;
+}
 export interface Vendor { _id: string; userId: { _id: string; firstName: string; lastName: string; email: string; phone: string }; businessName: string; businessSlug: string; description?: string; categories: Array<{ _id: string; name: string; slug: string }>; status: string; averageRating: number; totalReviews: number; totalListings: number; totalBookings: number; isAvailable: boolean; address: { city: string; country: string }; createdAt: string; }
 export interface Listing { _id: string; title: string; slug: string; vendor: { _id: string; businessName: string; businessSlug: string }; category: { _id: string; name: string; slug: string }; pricing: { basePrice: number; currency: string; priceUnit: string }; images: Array<{ url: string }>; status: string; isFeatured: boolean; averageRating: number; totalReviews: number; createdAt: string; }
 export interface Booking { _id: string; bookingNumber: string; client: { _id: string; firstName: string; lastName: string; email: string }; listing: { _id: string; title: string; slug: string }; vendor: { _id: string; businessName: string }; eventDate: string; pricingSnapshot: { totalAmount: number; currency: string }; status: string; createdAt: string; }

@@ -57,13 +57,15 @@ const renderCustomLabel = ({
   outerRadius,
   percent,
 }: {
-  cx: number;
-  cy: number;
-  midAngle: number;
-  innerRadius: number;
-  outerRadius: number;
-  percent: number;
+  cx?: number;
+  cy?: number;
+  midAngle?: number;
+  innerRadius?: number;
+  outerRadius?: number;
+  percent?: number;
 }) => {
+  if (cx === undefined || cy === undefined || midAngle === undefined ||
+      innerRadius === undefined || outerRadius === undefined || percent === undefined) return null;
   if (percent < 0.05) return null;
   const RADIAN = Math.PI / 180;
   const radius = innerRadius + (outerRadius - innerRadius) * 0.5;

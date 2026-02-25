@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import Select from '../../components/ui/Select';
@@ -7,53 +7,17 @@ import LineChartComponent from '../../components/charts/LineChart';
 import BarChartComponent from '../../components/charts/BarChart';
 import AreaChartComponent from '../../components/charts/AreaChart';
 import PieChartComponent from '../../components/charts/PieChart';
-import { MdDownload, MdTrendingUp, MdStar } from 'react-icons/md';
+import { MdDownload, MdTrendingUp, MdTrendingDown, MdStar } from 'react-icons/md';
 import { showToast } from '../../components/feedback/Toast';
-
-const revenueData = [
-  { month: 'Jul', revenue: 28000, commission: 2800 },
-  { month: 'Aug', revenue: 32000, commission: 3200 },
-  { month: 'Sep', revenue: 38000, commission: 3800 },
-  { month: 'Oct', revenue: 41000, commission: 4100 },
-  { month: 'Nov', revenue: 47000, commission: 4700 },
-  { month: 'Dec', revenue: 55000, commission: 5500 },
-  { month: 'Jan', revenue: 52000, commission: 5200 },
-];
-
-const bookingsByStatus = [
-  { name: 'Confirmed', value: 320, color: '#10B981' },
-  { name: 'Pending', value: 85, color: '#FFB400' },
-  { name: 'Completed', value: 480, color: '#8B5CF6' },
-  { name: 'Cancelled', value: 45, color: '#B0B0B0' },
-  { name: 'Rejected', value: 20, color: '#C13515' },
-];
-
-const bookingsByCategory = [
-  { category: 'Venues', confirmed: 145, pending: 25 },
-  { category: 'Catering', confirmed: 120, pending: 18 },
-  { category: 'Photography', confirmed: 95, pending: 12 },
-  { category: 'Entertainment', confirmed: 80, pending: 15 },
-  { category: 'Decoration', confirmed: 65, pending: 8 },
-  { category: 'Planning', confirmed: 55, pending: 7 },
-];
-
-const userGrowthData = [
-  { month: 'Jul', users: 850, vendors: 45 },
-  { month: 'Aug', users: 1020, vendors: 52 },
-  { month: 'Sep', users: 1180, vendors: 60 },
-  { month: 'Oct', users: 1350, vendors: 68 },
-  { month: 'Nov', users: 1520, vendors: 75 },
-  { month: 'Dec', users: 1780, vendors: 85 },
-  { month: 'Jan', users: 1950, vendors: 92 },
-];
-
-const topVendors = [
-  { name: 'Elite Venues', bookings: 85, revenue: 125000, rating: 4.9 },
-  { name: 'Taste Masters', bookings: 72, revenue: 98000, rating: 4.8 },
-  { name: 'Snap Studios', bookings: 65, revenue: 78000, rating: 4.7 },
-  { name: 'Melody Makers', bookings: 58, revenue: 92000, rating: 4.6 },
-  { name: 'Green Events', bookings: 52, revenue: 68000, rating: 4.5 },
-];
+import { reportsApi } from '../../services/api/reportsApi';
+import type {
+  ReportPeriod,
+  RevenueStats,
+  BookingStats,
+  UserGrowthStats,
+  TopVendorsStats,
+} from '../../services/api/reportsApi';
+import LoadingSpinner from '../../components/feedback/LoadingSpinner';
 
 const reportTabs = [
   { key: 'revenue', label: 'Revenue' },
@@ -72,11 +36,86 @@ const periodOptions = [
 
 const ReportsPage = () => {
   const [activeTab, setActiveTab] = useState('revenue');
-  const [period, setPeriod] = useState('6m');
+  const [period, setPeriod] = useState<ReportPeriod>('6m');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const [revenueStats, setRevenueStats] = useState<RevenueStats | null>(null);
+  const [bookingStats, setBookingStats] = useState<BookingStats | null>(null);
+  const [userGrowthStats, setUserGrowthStats] = useState<UserGrowthStats | null>(null);
+  const [topVendorsStats, setTopVendorsStats] = useState<TopVendorsStats | null>(null);
+
+  useEffect(() => {
+    const fetchReportsData = async () => {
+      setLoading(true);
+      setError(null);
+
+      try {
+        const response = await reportsApi.getAll(period);
+        const { revenue, bookings, userGrowth, topVendors } = response.data.data;
+
+        setRevenueStats(revenue);
+        setBookingStats(bookings);
+        setUserGrowthStats(userGrowth);
+        setTopVendorsStats(topVendors);
+      } catch (err) {
+        console.error('Failed to fetch reports:', err);
+        setError('Failed to load reports data. Please try again.');
+        showToast.error('Failed to load reports data');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchReportsData();
+  }, [period]);
 
   const handleExport = () => {
     showToast.info('Export functionality will be available in a future update.');
   };
+
+  const formatCurrency = (amount: number): string => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount);
+  };
+
+  const renderChangeIndicator = (change: number) => {
+    const isPositive = change >= 0;
+    const Icon = isPositive ? MdTrendingUp : MdTrendingDown;
+    const colorClass = isPositive ? 'text-success-500' : 'text-error-500';
+
+    return (
+      <div className="flex items-center gap-1 mt-1">
+        <Icon className={`w-4 h-4 ${colorClass}`} />
+        <span className={`text-xs font-medium ${colorClass}`}>
+          {isPositive ? '+' : ''}{change}% vs previous
+        </span>
+      </div>
+    );
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <LoadingSpinner size="lg" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] text-center">
+        <p className="text-error-500 mb-4">{error}</p>
+        <Button variant="primary" onClick={() => window.location.reload()}>
+          Retry
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -91,7 +130,7 @@ const ReportsPage = () => {
             <Select
               options={periodOptions}
               value={period}
-              onChange={(e) => setPeriod(e.target.value)}
+              onChange={(e) => setPeriod(e.target.value as ReportPeriod)}
             />
           </div>
           <Button
@@ -109,33 +148,30 @@ const ReportsPage = () => {
       <Tabs tabs={reportTabs} activeTab={activeTab} onChange={setActiveTab} />
 
       {/* Revenue Report */}
-      {activeTab === 'revenue' && (
+      {activeTab === 'revenue' && revenueStats && (
         <div className="space-y-6">
           {/* Summary Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <Card>
               <p className="text-sm text-neutral-400">Total Revenue</p>
-              <p className="text-2xl font-bold text-neutral-600 mt-1">$293,000</p>
-              <div className="flex items-center gap-1 mt-1">
-                <MdTrendingUp className="w-4 h-4 text-success-500" />
-                <span className="text-xs text-success-500 font-medium">+18.5% vs previous</span>
-              </div>
+              <p className="text-2xl font-bold text-neutral-600 mt-1">
+                {formatCurrency(revenueStats.summary.totalRevenue)}
+              </p>
+              {renderChangeIndicator(revenueStats.summary.revenueChange)}
             </Card>
             <Card>
               <p className="text-sm text-neutral-400">Total Commission</p>
-              <p className="text-2xl font-bold text-neutral-600 mt-1">$29,300</p>
-              <div className="flex items-center gap-1 mt-1">
-                <MdTrendingUp className="w-4 h-4 text-success-500" />
-                <span className="text-xs text-success-500 font-medium">+18.5% vs previous</span>
-              </div>
+              <p className="text-2xl font-bold text-neutral-600 mt-1">
+                {formatCurrency(revenueStats.summary.totalCommission)}
+              </p>
+              {renderChangeIndicator(revenueStats.summary.revenueChange)}
             </Card>
             <Card>
               <p className="text-sm text-neutral-400">Avg. Booking Value</p>
-              <p className="text-2xl font-bold text-neutral-600 mt-1">$1,850</p>
-              <div className="flex items-center gap-1 mt-1">
-                <MdTrendingUp className="w-4 h-4 text-success-500" />
-                <span className="text-xs text-success-500 font-medium">+5.2% vs previous</span>
-              </div>
+              <p className="text-2xl font-bold text-neutral-600 mt-1">
+                {formatCurrency(revenueStats.summary.avgBookingValue)}
+              </p>
+              {renderChangeIndicator(revenueStats.summary.avgChange)}
             </Card>
           </div>
 
@@ -143,34 +179,46 @@ const ReportsPage = () => {
           <Card>
             <Card.Header title="Revenue Trend" subtitle="Monthly revenue and commission" />
             <Card.Body>
-              <AreaChartComponent
-                data={revenueData}
-                xAxisKey="month"
-                areas={[
-                  { dataKey: 'revenue', name: 'Revenue', color: '#044A1A' },
-                  { dataKey: 'commission', name: 'Commission', color: '#0D7C5F' },
-                ]}
-                height={350}
-              />
+              {revenueStats.revenueData.length > 0 ? (
+                <AreaChartComponent
+                  data={revenueStats.revenueData}
+                  xAxisKey="month"
+                  areas={[
+                    { dataKey: 'revenue', name: 'Revenue', color: '#044A1A' },
+                    { dataKey: 'commission', name: 'Commission', color: '#0D7C5F' },
+                  ]}
+                  height={350}
+                />
+              ) : (
+                <div className="flex items-center justify-center h-[350px] text-neutral-400">
+                  No revenue data available for this period
+                </div>
+              )}
             </Card.Body>
           </Card>
         </div>
       )}
 
       {/* Bookings Report */}
-      {activeTab === 'bookings' && (
+      {activeTab === 'bookings' && bookingStats && (
         <div className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Bookings by Status */}
             <Card>
               <Card.Header title="Bookings by Status" subtitle="Overall distribution" />
               <Card.Body>
-                <PieChartComponent
-                  data={bookingsByStatus}
-                  height={320}
-                  centerText="950"
-                  centerSubtext="Total"
-                />
+                {bookingStats.byStatus.length > 0 ? (
+                  <PieChartComponent
+                    data={bookingStats.byStatus}
+                    height={320}
+                    centerText={String(bookingStats.totalBookings)}
+                    centerSubtext="Total"
+                  />
+                ) : (
+                  <div className="flex items-center justify-center h-[320px] text-neutral-400">
+                    No booking data available
+                  </div>
+                )}
               </Card.Body>
             </Card>
 
@@ -178,16 +226,22 @@ const ReportsPage = () => {
             <Card>
               <Card.Header title="Bookings by Category" subtitle="Confirmed vs Pending" />
               <Card.Body>
-                <BarChartComponent
-                  data={bookingsByCategory}
-                  xAxisKey="category"
-                  bars={[
-                    { dataKey: 'confirmed', name: 'Confirmed', color: '#10B981', stackId: 'a' },
-                    { dataKey: 'pending', name: 'Pending', color: '#FFB400', stackId: 'a' },
-                  ]}
-                  height={320}
-                  stacked
-                />
+                {bookingStats.byCategory.length > 0 ? (
+                  <BarChartComponent
+                    data={bookingStats.byCategory}
+                    xAxisKey="category"
+                    bars={[
+                      { dataKey: 'confirmed', name: 'Confirmed', color: '#10B981', stackId: 'a' },
+                      { dataKey: 'pending', name: 'Pending', color: '#FFB400', stackId: 'a' },
+                    ]}
+                    height={320}
+                    stacked
+                  />
+                ) : (
+                  <div className="flex items-center justify-center h-[320px] text-neutral-400">
+                    No category data available
+                  </div>
+                )}
               </Card.Body>
             </Card>
           </div>
@@ -195,75 +249,87 @@ const ReportsPage = () => {
       )}
 
       {/* User Growth */}
-      {activeTab === 'growth' && (
+      {activeTab === 'growth' && userGrowthStats && (
         <Card>
           <Card.Header title="User & Vendor Growth" subtitle="Monthly registration trends" />
           <Card.Body>
-            <LineChartComponent
-              data={userGrowthData}
-              xAxisKey="month"
-              lines={[
-                { dataKey: 'users', name: 'Users', color: '#044A1A', strokeWidth: 2.5 },
-                { dataKey: 'vendors', name: 'Vendors', color: '#0D7C5F', strokeWidth: 2.5, dashed: true },
-              ]}
-              height={400}
-            />
+            {userGrowthStats.growthData.length > 0 ? (
+              <LineChartComponent
+                data={userGrowthStats.growthData}
+                xAxisKey="month"
+                lines={[
+                  { dataKey: 'users', name: 'Users', color: '#044A1A', strokeWidth: 2.5 },
+                  { dataKey: 'vendors', name: 'Vendors', color: '#0D7C5F', strokeWidth: 2.5, dashed: true },
+                ]}
+                height={400}
+              />
+            ) : (
+              <div className="flex items-center justify-center h-[400px] text-neutral-400">
+                No user growth data available
+              </div>
+            )}
           </Card.Body>
         </Card>
       )}
 
       {/* Top Vendors */}
-      {activeTab === 'vendors' && (
+      {activeTab === 'vendors' && topVendorsStats && (
         <Card padding={false}>
           <div className="p-6 pb-0">
             <Card.Header title="Top Performing Vendors" subtitle="Based on bookings and revenue" />
           </div>
           <div className="mt-4 overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-neutral-100">
-                  <th className="table-header">Rank</th>
-                  <th className="table-header">Vendor</th>
-                  <th className="table-header">Bookings</th>
-                  <th className="table-header">Revenue</th>
-                  <th className="table-header">Rating</th>
-                </tr>
-              </thead>
-              <tbody>
-                {topVendors.map((vendor, idx) => (
-                  <tr key={vendor.name} className="border-b border-neutral-50 last:border-0">
-                    <td className="table-cell">
-                      <span
-                        className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${
-                          idx === 0
-                            ? 'bg-warning-100 text-warning-600'
-                            : idx === 1
-                            ? 'bg-neutral-200 text-neutral-500'
-                            : idx === 2
-                            ? 'bg-orange-100 text-orange-600'
-                            : 'bg-neutral-50 text-neutral-400'
-                        }`}
-                      >
-                        {idx + 1}
-                      </span>
-                    </td>
-                    <td className="table-cell font-medium text-neutral-600">
-                      {vendor.name}
-                    </td>
-                    <td className="table-cell">{vendor.bookings}</td>
-                    <td className="table-cell font-medium">
-                      ${vendor.revenue.toLocaleString()}
-                    </td>
-                    <td className="table-cell">
-                      <div className="flex items-center gap-1">
-                        <MdStar className="w-4 h-4 text-warning-500" />
-                        <span className="font-medium">{vendor.rating}</span>
-                      </div>
-                    </td>
+            {topVendorsStats.vendors.length > 0 ? (
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-neutral-100">
+                    <th className="table-header">Rank</th>
+                    <th className="table-header">Vendor</th>
+                    <th className="table-header">Bookings</th>
+                    <th className="table-header">Revenue</th>
+                    <th className="table-header">Rating</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {topVendorsStats.vendors.map((vendor, idx) => (
+                    <tr key={vendor._id} className="border-b border-neutral-50 last:border-0">
+                      <td className="table-cell">
+                        <span
+                          className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${
+                            idx === 0
+                              ? 'bg-warning-100 text-warning-600'
+                              : idx === 1
+                              ? 'bg-neutral-200 text-neutral-500'
+                              : idx === 2
+                              ? 'bg-orange-100 text-orange-600'
+                              : 'bg-neutral-50 text-neutral-400'
+                          }`}
+                        >
+                          {idx + 1}
+                        </span>
+                      </td>
+                      <td className="table-cell font-medium text-neutral-600">
+                        {vendor.name}
+                      </td>
+                      <td className="table-cell">{vendor.bookings}</td>
+                      <td className="table-cell font-medium">
+                        {formatCurrency(vendor.revenue)}
+                      </td>
+                      <td className="table-cell">
+                        <div className="flex items-center gap-1">
+                          <MdStar className="w-4 h-4 text-warning-500" />
+                          <span className="font-medium">{vendor.rating.toFixed(1)}</span>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <div className="flex items-center justify-center h-[200px] text-neutral-400">
+                No vendor data available for this period
+              </div>
+            )}
           </div>
         </Card>
       )}
