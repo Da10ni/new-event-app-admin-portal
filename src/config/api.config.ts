@@ -10,6 +10,7 @@ export const API_CONFIG = {
       LISTINGS: '/admin/listings',
       BOOKINGS: '/admin/bookings',
       CATEGORIES: '/admin/categories',
+      REVIEWS: '/admin/reviews',
       REPORTS: {
         BASE: '/admin/reports',
         REVENUE: '/admin/reports/revenue',

@@ -50,9 +50,8 @@ const VendorDetailPage = () => {
       dispatch(setLoading(true));
       try {
         const response = await vendorApi.getAll({ _id: id });
-        const vendorData = Array.isArray(response.data.data)
-          ? response.data.data[0]
-          : response.data.data;
+        const vendors = response.data.data?.vendors || response.data.data;
+        const vendorData = Array.isArray(vendors) ? vendors[0] : vendors;
         dispatch(setSelectedVendor(vendorData || null));
       } catch {
         showToast.error('Failed to load vendor details');

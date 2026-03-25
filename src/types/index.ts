@@ -19,6 +19,19 @@ export interface DashboardStats {
   trends: DashboardTrends;
 }
 export interface Vendor { _id: string; userId: { _id: string; firstName: string; lastName: string; email: string; phone: string }; businessName: string; businessSlug: string; description?: string; categories: Array<{ _id: string; name: string; slug: string }>; status: string; averageRating: number; totalReviews: number; totalListings: number; totalBookings: number; isAvailable: boolean; address: { city: string; country: string }; createdAt: string; }
-export interface Listing { _id: string; title: string; slug: string; vendor: { _id: string; businessName: string; businessSlug: string }; category: { _id: string; name: string; slug: string }; pricing: { basePrice: number; currency: string; priceUnit: string }; images: Array<{ url: string }>; status: string; isFeatured: boolean; averageRating: number; totalReviews: number; createdAt: string; }
-export interface Booking { _id: string; bookingNumber: string; client: { _id: string; firstName: string; lastName: string; email: string }; listing: { _id: string; title: string; slug: string }; vendor: { _id: string; businessName: string }; eventDate: string; pricingSnapshot: { totalAmount: number; currency: string }; status: string; createdAt: string; }
+export interface Listing { _id: string; title: string; slug: string; description?: string; vendor: { _id: string; businessName: string; businessSlug: string }; category: { _id: string; name: string; slug: string }; pricing: { basePrice: number; currency: string; priceUnit: string; maxPrice?: number; packages?: Array<{ name: string; description?: string; price: number; includes?: string[] }> }; images: Array<{ url: string; publicId?: string; caption?: string; isPrimary?: boolean }>; address?: { street?: string; city?: string; state?: string; country?: string; zipCode?: string; area?: string }; capacity?: { min: number; max: number }; amenities?: string[]; tags?: string[]; status: string; isFeatured: boolean; averageRating: number; totalReviews: number; totalBookings?: number; viewCount?: number; createdAt: string; updatedAt?: string; }
+export interface Booking {
+  _id: string; bookingNumber: string;
+  client: { _id: string; firstName: string; lastName: string; email: string; phone?: string; avatar?: { url: string } };
+  listing: { _id: string; title: string; slug: string; images?: Array<{ url: string }>; pricing?: { basePrice: number; currency: string; priceUnit: string }; address?: { city: string; country: string } };
+  vendor: { _id: string; businessName: string; businessSlug?: string };
+  eventDate: string; eventEndDate?: string; eventType?: string; guestCount?: number;
+  clientMessage?: string; vendorResponse?: string;
+  pricingSnapshot: { basePrice?: number; totalAmount: number; currency: string };
+  status: string;
+  paymentStatus?: string; paymentIntentId?: string; transactionId?: string; paidAt?: string;
+  refundId?: string; refundedAt?: string;
+  isReviewed?: boolean;
+  createdAt: string;
+}
 export interface Category { _id: string; name: string; slug: string; description?: string; sortOrder: number; isActive: boolean; listingCount: number; }

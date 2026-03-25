@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import DataTable from '../../components/data-display/DataTable';
 import type { Column } from '../../components/data-display/DataTable';
 import Input from '../../components/ui/Input';
@@ -7,33 +7,36 @@ import Button from '../../components/ui/Button';
 import Modal from '../../components/ui/Modal';
 import ConfirmDialog from '../../components/feedback/ConfirmDialog';
 import { showToast } from '../../components/feedback/Toast';
-import { MdSearch, MdStar, MdDelete, MdFlag, MdVisibility } from 'react-icons/md';
+import { MdSearch, MdStar, MdDelete, MdFlag, MdVisibility, MdVisibilityOff, MdSort } from 'react-icons/md';
 import { format } from 'date-fns';
+import { reviewApi } from '../../services/api/reviewApi';
 
 interface Review {
   _id: string;
   listing: { _id: string; title: string };
   client: { _id: string; firstName: string; lastName: string };
+  vendor: { _id: string; businessName: string };
   rating: number;
+  title?: string;
   comment: string;
+  detailedRatings?: {
+    quality?: number;
+    communication?: number;
+    valueForMoney?: number;
+    punctuality?: number;
+  };
+  vendorReply?: { comment: string; repliedAt: string };
+  isVisible: boolean;
   isReported: boolean;
   createdAt: string;
 }
-
-const mockReviews: Review[] = [
-  { _id: '1', listing: { _id: 'l1', title: 'Grand Ballroom' }, client: { _id: 'c1', firstName: 'Sarah', lastName: 'Johnson' }, rating: 5, comment: 'Amazing venue! Everything was perfect for our wedding reception. The staff was incredibly helpful and professional.', isReported: false, createdAt: '2024-01-15T10:00:00Z' },
-  { _id: '2', listing: { _id: 'l2', title: 'Garden Party Setup' }, client: { _id: 'c2', firstName: 'Michael', lastName: 'Chen' }, rating: 4, comment: 'Great outdoor setup, beautiful decorations. Minor issue with the lighting but overall fantastic.', isReported: false, createdAt: '2024-01-14T15:00:00Z' },
-  { _id: '3', listing: { _id: 'l3', title: 'Premium Photography' }, client: { _id: 'c3', firstName: 'Emily', lastName: 'Davis' }, rating: 2, comment: 'Photographer was late and missed several key moments. Not worth the premium price.', isReported: true, createdAt: '2024-01-13T09:00:00Z' },
-  { _id: '4', listing: { _id: 'l4', title: 'Live Band Performance' }, client: { _id: 'c4', firstName: 'James', lastName: 'Wilson' }, rating: 5, comment: 'The band was incredible! They had everyone dancing all night. Highly recommend for any event.', isReported: false, createdAt: '2024-01-12T14:00:00Z' },
-  { _id: '5', listing: { _id: 'l5', title: 'Elegant Catering' }, client: { _id: 'c5', firstName: 'Lisa', lastName: 'Brown' }, rating: 1, comment: 'Terrible experience. Food was cold and service was rude. This is spam content that should be removed.', isReported: true, createdAt: '2024-01-11T11:00:00Z' },
-  { _id: '6', listing: { _id: 'l1', title: 'Grand Ballroom' }, client: { _id: 'c6', firstName: 'Robert', lastName: 'Taylor' }, rating: 4, comment: 'Beautiful venue with great amenities. Parking could be better.', isReported: false, createdAt: '2024-01-10T16:00:00Z' },
-];
 
 const filterTabs = [
   { key: 'all', label: 'All Reviews' },
   { key: 'reported', label: 'Reported' },
   { key: 'high', label: '4-5 Stars' },
   { key: 'low', label: '1-2 Stars' },
+  { key: 'hidden', label: 'Hidden' },
 ];
 
 const RatingStars = ({ rating }: { rating: number }) => (
@@ -48,32 +51,76 @@ const RatingStars = ({ rating }: { rating: number }) => (
 );
 
 const ReviewListPage = () => {
-  const [reviews] = useState<Review[]>(mockReviews);
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('all');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
   const [selectedReview, setSelectedReview] = useState<Review | null>(null);
-  const [deleteReview, setDeleteReview] = useState<Review | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Review | null>(null);
+  const [sortByRating, setSortByRating] = useState<'desc' | 'asc' | ''>('desc');
 
-  const filteredReviews = reviews.filter((r) => {
-    if (activeTab === 'reported') return r.isReported;
-    if (activeTab === 'high') return r.rating >= 4;
-    if (activeTab === 'low') return r.rating <= 2;
-    if (search) {
-      const q = search.toLowerCase();
-      return (
-        r.listing.title.toLowerCase().includes(q) ||
-        `${r.client.firstName} ${r.client.lastName}`.toLowerCase().includes(q) ||
-        r.comment.toLowerCase().includes(q)
-      );
+  const fetchReviews = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params: Record<string, unknown> = { page, limit: 10 };
+
+      if (activeTab === 'reported') params.isReported = true;
+      if (activeTab === 'high') params['rating[gte]'] = 4;
+      if (activeTab === 'low') params['rating[lte]'] = 2;
+      if (activeTab === 'hidden') params.isVisible = false;
+
+      if (sortByRating === 'desc') params.sort = '-rating,-createdAt';
+      else if (sortByRating === 'asc') params.sort = 'rating,-createdAt';
+      else params.sort = '-createdAt';
+
+      if (search.trim()) params.search = search.trim();
+
+      const res = await reviewApi.getAll(params);
+      const data = res.data?.data;
+      setReviews(data?.reviews || []);
+      setTotalItems(res.data?.meta?.total || 0);
+    } catch {
+      showToast.error('Failed to load reviews');
+    } finally {
+      setLoading(false);
     }
-    return true;
-  });
+  }, [page, activeTab, sortByRating, search]);
 
-  const handleDelete = () => {
-    if (!deleteReview) return;
-    showToast.success('Review deleted successfully');
-    setDeleteReview(null);
+  useEffect(() => {
+    fetchReviews();
+  }, [fetchReviews]);
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    try {
+      await reviewApi.delete(deleteTarget._id);
+      showToast.success('Review deleted successfully');
+      setDeleteTarget(null);
+      fetchReviews();
+    } catch {
+      showToast.error('Failed to delete review');
+    }
+  };
+
+  const handleToggleVisibility = async (review: Review) => {
+    try {
+      await reviewApi.toggleVisibility(review._id);
+      showToast.success(review.isVisible ? 'Review hidden' : 'Review made visible');
+      fetchReviews();
+    } catch {
+      showToast.error('Failed to update review visibility');
+    }
+  };
+
+  const cycleSortByRating = () => {
+    setSortByRating((prev) => {
+      if (prev === '') return 'desc';
+      if (prev === 'desc') return 'asc';
+      return '';
+    });
+    setPage(1);
   };
 
   const columns: Column<Review>[] = [
@@ -83,14 +130,14 @@ const ReviewListPage = () => {
       sortable: true,
       accessor: (row) => (
         <span className="font-medium text-neutral-600 truncate max-w-[180px] block">
-          {row.listing.title}
+          {row.listing?.title || 'N/A'}
         </span>
       ),
     },
     {
       key: 'client',
       header: 'Client',
-      accessor: (row) => `${row.client.firstName} ${row.client.lastName}`,
+      accessor: (row) => `${row.client?.firstName || ''} ${row.client?.lastName || ''}`,
     },
     {
       key: 'rating',
@@ -114,16 +161,25 @@ const ReviewListPage = () => {
       accessor: (row) => format(new Date(row.createdAt), 'MMM d, yyyy'),
     },
     {
-      key: 'reported',
-      header: 'Reported',
-      accessor: (row) =>
-        row.isReported ? (
-          <span className="flex items-center gap-1 text-error-500 text-xs font-medium">
-            <MdFlag className="w-3.5 h-3.5" /> Reported
-          </span>
-        ) : (
-          <span className="text-xs text-neutral-300">-</span>
-        ),
+      key: 'status',
+      header: 'Status',
+      accessor: (row) => (
+        <div className="flex flex-col gap-1">
+          {row.isReported && (
+            <span className="flex items-center gap-1 text-error-500 text-xs font-medium">
+              <MdFlag className="w-3.5 h-3.5" /> Reported
+            </span>
+          )}
+          {!row.isVisible && (
+            <span className="flex items-center gap-1 text-neutral-400 text-xs font-medium">
+              <MdVisibilityOff className="w-3.5 h-3.5" /> Hidden
+            </span>
+          )}
+          {!row.isReported && row.isVisible && (
+            <span className="text-xs text-neutral-300">-</span>
+          )}
+        </div>
+      ),
     },
     {
       key: 'actions',
@@ -139,8 +195,18 @@ const ReviewListPage = () => {
           <Button
             variant="ghost"
             size="sm"
+            icon={
+              row.isVisible
+                ? <MdVisibilityOff className="w-4 h-4 text-warning-500" />
+                : <MdVisibility className="w-4 h-4 text-success-500" />
+            }
+            onClick={() => handleToggleVisibility(row)}
+          />
+          <Button
+            variant="ghost"
+            size="sm"
             icon={<MdDelete className="w-4 h-4 text-error-500" />}
-            onClick={() => setDeleteReview(row)}
+            onClick={() => setDeleteTarget(row)}
           />
         </div>
       ),
@@ -158,27 +224,38 @@ const ReviewListPage = () => {
       {/* Filter Tabs */}
       <Tabs tabs={filterTabs} activeTab={activeTab} onChange={(key) => { setActiveTab(key); setPage(1); }} />
 
-      {/* Search */}
+      {/* Search + Sort */}
       <div className="flex items-center gap-4">
         <div className="w-80">
           <Input
             placeholder="Search reviews..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
             icon={<MdSearch className="w-4 h-4" />}
           />
         </div>
+        <Button
+          variant={sortByRating ? 'outline' : 'ghost'}
+          size="sm"
+          onClick={cycleSortByRating}
+        >
+          <MdSort className="w-4 h-4 mr-1" />
+          {sortByRating === 'desc' ? 'Highest First' : sortByRating === 'asc' ? 'Lowest First' : 'Sort by Rating'}
+        </Button>
       </div>
 
       {/* Table */}
       <DataTable
         columns={columns}
-        data={filteredReviews}
+        data={reviews}
         emptyMessage="No reviews found"
         rowKey={(row) => row._id}
         currentPage={page}
         onPageChange={setPage}
         pageSize={10}
+        totalItems={totalItems}
+        serverSidePagination
+        loading={loading}
       />
 
       {/* Review Detail Modal */}
@@ -192,44 +269,91 @@ const ReviewListPage = () => {
           <div className="space-y-4">
             <div>
               <p className="text-xs text-neutral-400 mb-1">Listing</p>
-              <p className="text-sm font-medium text-neutral-600">{selectedReview.listing.title}</p>
+              <p className="text-sm font-medium text-neutral-600">{selectedReview.listing?.title}</p>
             </div>
             <div>
               <p className="text-xs text-neutral-400 mb-1">Client</p>
               <p className="text-sm text-neutral-600">
-                {selectedReview.client.firstName} {selectedReview.client.lastName}
+                {selectedReview.client?.firstName} {selectedReview.client?.lastName}
               </p>
+            </div>
+            <div>
+              <p className="text-xs text-neutral-400 mb-1">Vendor</p>
+              <p className="text-sm text-neutral-600">{selectedReview.vendor?.businessName}</p>
             </div>
             <div>
               <p className="text-xs text-neutral-400 mb-1">Rating</p>
               <RatingStars rating={selectedReview.rating} />
             </div>
+            {selectedReview.title && (
+              <div>
+                <p className="text-xs text-neutral-400 mb-1">Title</p>
+                <p className="text-sm font-medium text-neutral-600">{selectedReview.title}</p>
+              </div>
+            )}
             <div>
               <p className="text-xs text-neutral-400 mb-1">Comment</p>
               <p className="text-sm text-neutral-500 leading-relaxed">{selectedReview.comment}</p>
             </div>
+            {selectedReview.detailedRatings && (
+              <div>
+                <p className="text-xs text-neutral-400 mb-2">Detailed Ratings</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {selectedReview.detailedRatings.quality != null && (
+                    <div className="text-sm text-neutral-500">Quality: {selectedReview.detailedRatings.quality}/5</div>
+                  )}
+                  {selectedReview.detailedRatings.communication != null && (
+                    <div className="text-sm text-neutral-500">Communication: {selectedReview.detailedRatings.communication}/5</div>
+                  )}
+                  {selectedReview.detailedRatings.valueForMoney != null && (
+                    <div className="text-sm text-neutral-500">Value: {selectedReview.detailedRatings.valueForMoney}/5</div>
+                  )}
+                  {selectedReview.detailedRatings.punctuality != null && (
+                    <div className="text-sm text-neutral-500">Punctuality: {selectedReview.detailedRatings.punctuality}/5</div>
+                  )}
+                </div>
+              </div>
+            )}
+            {selectedReview.vendorReply && (
+              <div className="p-3 bg-primary-50 border border-primary-200 rounded-lg">
+                <p className="text-xs text-neutral-400 mb-1">Vendor Reply</p>
+                <p className="text-sm text-neutral-500">{selectedReview.vendorReply.comment}</p>
+                <p className="text-xs text-neutral-300 mt-1">
+                  {format(new Date(selectedReview.vendorReply.repliedAt), 'MMMM d, yyyy h:mm a')}
+                </p>
+              </div>
+            )}
             <div>
               <p className="text-xs text-neutral-400 mb-1">Date</p>
               <p className="text-sm text-neutral-600">
                 {format(new Date(selectedReview.createdAt), 'MMMM d, yyyy h:mm a')}
               </p>
             </div>
-            {selectedReview.isReported && (
-              <div className="p-3 bg-error-50 border border-error-200 rounded-lg">
-                <p className="text-sm text-error-500 font-medium flex items-center gap-2">
-                  <MdFlag className="w-4 h-4" /> This review has been reported
-                </p>
-              </div>
-            )}
+            <div className="flex gap-2">
+              {selectedReview.isReported && (
+                <div className="p-3 bg-error-50 border border-error-200 rounded-lg flex-1">
+                  <p className="text-sm text-error-500 font-medium flex items-center gap-2">
+                    <MdFlag className="w-4 h-4" /> This review has been reported
+                  </p>
+                </div>
+              )}
+              {!selectedReview.isVisible && (
+                <div className="p-3 bg-neutral-50 border border-neutral-200 rounded-lg flex-1">
+                  <p className="text-sm text-neutral-500 font-medium flex items-center gap-2">
+                    <MdVisibilityOff className="w-4 h-4" /> This review is hidden
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
         </Modal>
       )}
 
       {/* Delete Confirm */}
-      {deleteReview && (
+      {deleteTarget && (
         <ConfirmDialog
-          isOpen={!!deleteReview}
-          onClose={() => setDeleteReview(null)}
+          isOpen={!!deleteTarget}
+          onClose={() => setDeleteTarget(null)}
           onConfirm={handleDelete}
           title="Delete Review"
           message="Are you sure you want to delete this review? This action cannot be undone."

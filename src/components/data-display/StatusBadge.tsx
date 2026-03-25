@@ -57,9 +57,10 @@ const StatusBadge = ({
   className = '',
 }: StatusBadgeProps) => {
   const map = statusMaps[type];
-  const statusInfo = map[status.toLowerCase()] || {
+  const safeStatus = status || 'unknown';
+  const statusInfo = map[safeStatus.toLowerCase()] || {
     variant: 'default' as BadgeVariant,
-    label: status.charAt(0).toUpperCase() + status.slice(1),
+    label: safeStatus.charAt(0).toUpperCase() + safeStatus.slice(1),
   };
 
   return (

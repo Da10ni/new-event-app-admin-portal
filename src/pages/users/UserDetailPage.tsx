@@ -56,9 +56,8 @@ const UserDetailPage = () => {
       setLoading(true);
       try {
         const response = await userApi.getAll({ _id: id });
-        const userData = Array.isArray(response.data.data)
-          ? response.data.data[0]
-          : response.data.data;
+        const users = response.data.data?.users || response.data.data;
+        const userData = Array.isArray(users) ? users[0] : users;
         setUser(userData || null);
       } catch {
         showToast.error('Failed to load user details');
@@ -82,6 +81,13 @@ const UserDetailPage = () => {
     } finally {
       setActionLoading(false);
     }
+  };
+
+  const formatDate = (dateStr: string | undefined, pattern = 'MMM d, yyyy') => {
+    if (!dateStr) return 'N/A';
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return 'N/A';
+    return format(date, pattern);
   };
 
   if (loading || !user) {
@@ -143,7 +149,7 @@ const UserDetailPage = () => {
               </div>
               <div className="flex items-center gap-2 text-sm text-neutral-400">
                 <MdCalendarToday className="w-4 h-4" />
-                <span>Joined {format(new Date(user.createdAt), 'MMM d, yyyy')}</span>
+                <span>Joined {formatDate(user.createdAt)}</span>
               </div>
             </div>
           </div>
@@ -201,7 +207,7 @@ const UserDetailPage = () => {
                 <div>
                   <p className="text-xs text-neutral-400 mb-1">Member Since</p>
                   <p className="text-sm text-neutral-600 font-medium">
-                    {format(new Date(user.createdAt), 'MMMM d, yyyy')}
+                    {formatDate(user.createdAt, 'MMMM d, yyyy')}
                   </p>
                 </div>
               </div>
