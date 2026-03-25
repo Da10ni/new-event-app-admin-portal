@@ -9,7 +9,8 @@ export const clearTokens = () => { localStorage.removeItem('admin_access_token')
 axiosInstance.interceptors.request.use((config: InternalAxiosRequestConfig) => { const token = getToken(); if (token) config.headers.Authorization = `Bearer ${token}`; return config; }, (error) => Promise.reject(error));
 axiosInstance.interceptors.response.use((response) => response, async (error: AxiosError) => {
   const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
-  if (error.response?.status === 401 && !originalRequest._retry) {
+  const isAuthRequest = originalRequest.url?.includes('/auth/login') || originalRequest.url?.includes('/auth/register');
+  if (error.response?.status === 401 && !originalRequest._retry && !isAuthRequest) {
     originalRequest._retry = true;
     try { const rt = getRefreshToken(); if (!rt) throw new Error(); const { data } = await axios.post(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.AUTH.REFRESH}`, { refreshToken: rt }); setTokens(data.data.accessToken, data.data.refreshToken); originalRequest.headers.Authorization = `Bearer ${data.data.accessToken}`; return axiosInstance(originalRequest); }
     catch { clearTokens(); window.location.href = '/login'; return Promise.reject(error); }
